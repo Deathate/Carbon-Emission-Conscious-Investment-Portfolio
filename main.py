@@ -12,8 +12,8 @@ MONTH = 60
 # 成分股比例
 Wb = np.array([1/50]*50)
 # 碳排放量上限
-Q = rng.uniform(size=50)*20
-Qtotal = 10
+# Q = rng.uniform(size=50)*20
+Qtotal = 40
 # 碳排放量
 carbon_emissions = rng.uniform(size=50)*100
 EXCEL_PATH = "TWN50_Monthly_return_18_22.xlsx"
@@ -72,7 +72,7 @@ Qb = np.matrix(carbon_emissions)
 # 1*50 50*50 50*1
 m.setObjective((Wp-Wb)@(B.T@B*market_factor_variance+delta)@(Wp-Wb))
 # 碳排放量小於Q
-m.addConstr(Qb@Wp.T <= Q)
+# m.addConstr(Qb@Wp.T <= Q)
 # 碳排放量總和為Qt(數值)
 m.addConstr((Qb@Wp.T).sum() == Qtotal)
 # 投資組合總和小於1
@@ -93,14 +93,14 @@ if m.status == gp.GRB.OPTIMAL:
     investment_portfolio = pd.DataFrame(Wp.X, columns=["投資組合"])
     carbon_emissions = pd.DataFrame(carbon_emissions, columns=["碳排放量"])
     Wb = pd.DataFrame(Wb, columns=["成分股比例"])
-    Q = pd.DataFrame(Q, columns=["碳排放量上限"])
+    # Q = pd.DataFrame(Q, columns=["碳排放量上限"])
     excluded_investment_portfolio = pd.DataFrame(
         excluded_investment_portfolio, columns=["必須為0的投資組合"])
     wp_lower_bound = pd.DataFrame([wp_lower_bound], columns=["投資組合總和下限"])
 
     # 輸出主要結果
     pd.concat([min_te, investment_portfolio, excluded_investment_portfolio, wp_lower_bound, investment_portfolio_sum,carbon_emissions_sum,
-                       parameters["name"], Wb, carbon_emissions, Q],axis=1).to_excel(Path(__file__).parent/"result1.xlsx", index=False)
+                       parameters["name"], Wb, carbon_emissions],axis=1).to_excel(Path(__file__).parent/"result1.xlsx", index=False)
     result = pd.concat([i[1] for i in company_info]).reset_index(drop=True)
     # 輸出其他結果
     result = pd.concat([ result, parameters, return_index, market_factor_variance], axis=1).to_excel(Path(__file__).parent/"result2.xlsx", index=False)
