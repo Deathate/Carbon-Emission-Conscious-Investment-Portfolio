@@ -43,21 +43,25 @@ for name, group in company_info:
     # 獨有風險
     group["idiosyncratic_risk"] = group["return"] - group["market_risk"]
     # 獨有風險變異數
-    parameters.loc[parameters.name == name,
+    parameters.loc[parameters.name == name.strip(),
                    "idiosyncratic_risk_variance"] = group["idiosyncratic_risk"].var(ddof=0)
+
 
 # 市場因子變異數
 market_factor_variance = df.iloc[:MONTH,
                                  df.columns.get_loc("return_index")].var(ddof=0)
-# 投資組合總和下限
-wp_lower_bound = df["wp_lower_bound"].values[0]
+
 # 碳排放量
 carbon_emissions = parameters["碳排放"].values
+# np.random.default_rng(seed=42)
+# carbon_emissions = rng.uniform(size=50)*100
+
 # 成分股比例
 Wb = parameters["持股比例"].values
+# Wb = np.array([0.02]*50)
 Wb = Wb/Wb.sum()
 # 碳排放量上限 = 總碳排放量*碳排放目標比例
-Qtotal = (parameters["碳排放"]*Wb).sum()
+Qtotal = np.dot(carbon_emissions, Wb)
 Q_percentage = df["碳排放目標比例"].values[0]
 
 # Create a new model
@@ -66,18 +70,19 @@ m = gp.Model()
 Wp = m.addMVar(N)
 # 50*50
 delta = np.diag(parameters["idiosyncratic_risk_variance"])
+
 # 1*50
 B = np.matrix(parameters["BETA"])
 # 1*50
 Qb = np.matrix(carbon_emissions)
+
 # Set objective function
 # 1*50 50*50 50*1
 m.setObjective((Wp-Wb)@(B.T@B*market_factor_variance+delta)@(Wp-Wb))
 # 碳排放量總和為Qt(數值)
-m.addConstr((Qb@Wp.T).sum() == Qtotal * Q_percentage)
+m.addConstr((Qb@Wp.T).sum() == (Qtotal * Q_percentage))
 # 投資組合總和小於1
 m.addConstr(Wp.sum() == 1)
-m.addConstr(Wp.sum() >= wp_lower_bound)
 # Solve it!
 m.optimize()
 
@@ -91,10 +96,9 @@ if m.status == gp.GRB.OPTIMAL:
     carbon_emissions = pd.DataFrame(carbon_emissions, columns=["碳排放量"])
     carbon_emissions_total = pd.DataFrame([Qtotal], columns=["原碳排放量總和"])
     Wb = pd.DataFrame(Wb, columns=["成分股比例"])
-    wp_lower_bound = pd.DataFrame([wp_lower_bound], columns=["投資組合總和下限"])
 
     # 輸出主要結果
-    pd.concat([min_te, investment_portfolio, wp_lower_bound, investment_portfolio_sum,carbon_emissions_sum,
+    pd.concat([min_te, investment_portfolio, investment_portfolio_sum,carbon_emissions_sum,
                        parameters["name"], Wb, carbon_emissions,carbon_emissions_total],axis=1).to_excel(Path(__file__).parent/"result1.xlsx", index=False)
     result = pd.concat([i[1] for i in company_info]).reset_index(drop=True)
     # 輸出其他結果
