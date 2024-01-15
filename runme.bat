@@ -1,3 +1,5 @@
-python -m venv %0/../
-%0/../Scripts/python.exe -m pip install -r %0/../requirements.txt
-%0/../Scripts/python.exe %0/../main.py
+cd %0\..\
+python -m venv .
+Scripts\python.exe -m pip install -r requirements.txt
+Scripts\python.exe main.py
+pause

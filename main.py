@@ -3,7 +3,7 @@ import gurobipy as gp
 import pandas as pd
 import numpy as np
 from pathlib import Path
-
+import scipy.stats as stats
 # 公司數量
 N = 50
 rng = np.random.default_rng(seed=42)
@@ -26,24 +26,27 @@ return_index = df.iloc[0:MONTH, [df.columns.get_loc(
 return_index_dict = return_index.set_index(return_index.iloc[:, 0].map(int))[
     "return_index"].to_dict()
 
-# BETA
-df.iloc[0:N, df.columns.get_loc("BETA")-1] = df.iloc[0:N, df.columns.get_loc("BETA")-1].map(lambda x: x.strip())
-beta = df.iloc[0:N, [df.columns.get_loc("BETA")-1, df.columns.get_loc("BETA")]].set_index(
-    df.iloc[:, df.columns.get_loc("BETA")-1][0:N].map(lambda x: x.strip()))["BETA"].to_dict()
-
-parameters = df.iloc[0:N, [df.columns.get_loc("name.1"), df.columns.get_loc("BETA"), df.columns.get_loc("碳排放"), df.columns.get_loc("持股比例")]]
+# print(df.iloc[0:N, df.columns.get_loc("BETA")])
+# exit()
+parameters = df.iloc[0:N, [df.columns.get_loc("name.1"), df.columns.get_loc("碳排放"), df.columns.get_loc("持股比例")]]
 parameters.rename(columns={parameters.columns[0]: "name"}, inplace=True)
 parameters["name"] = parameters["name"].map(lambda x: x.strip())
-parameters["idiosyncratic_risk_variance"] = 0.0
 
 for name, group in company_info:
+    name_strip = name.strip()
+    # use regression to get beta
+    x = np.array([return_index_dict[x] for x in group["month"]])
+    y = np.array(group["return"])
+    beta_value = stats.linregress(x,y).slope
+    parameters.loc[parameters.name == name_strip,
+                   "BETA"] = beta_value
     # 市場風險
     group["market_risk"] = group["month"].apply(
-        lambda x, name: beta[name.strip()]*return_index_dict[x], args=(name,))
+        lambda x: beta_value*return_index_dict[x])
     # 獨有風險
     group["idiosyncratic_risk"] = group["return"] - group["market_risk"]
     # 獨有風險變異數
-    parameters.loc[parameters.name == name.strip(),
+    parameters.loc[parameters.name == name_strip,
                    "idiosyncratic_risk_variance"] = group["idiosyncratic_risk"].var(ddof=0)
 
 
@@ -81,7 +84,7 @@ Qb = np.matrix(carbon_emissions)
 m.setObjective((Wp-Wb)@(B.T@B*market_factor_variance+delta)@(Wp-Wb))
 # 碳排放量總和為Qt(數值)
 m.addConstr((Qb@Wp.T).sum() == (Qtotal * Q_percentage))
-# 投資組合總和小於1
+# 投資組合總和等於1
 m.addConstr(Wp.sum() == 1)
 # Solve it!
 m.optimize()

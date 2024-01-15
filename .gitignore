@@ -2,3 +2,5 @@ Include/
 Lib/
 Scripts/
 pyvenv.cfg
+result1.xlsx
+result2.xlsx
